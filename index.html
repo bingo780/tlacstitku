@@ -3,68 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Skener: Windows + iOS Fix</title>
+    <title>Tlač štítkov: QR + OCR + USB</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #eef2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
         #main-container {
-            width: 100%; max-width: 600px; margin: 10px;
+            width: 100%; max-width: 700px; margin: 15px;
             display: flex; flex-direction: column; gap: 15px;
         }
 
-        /* KARTY */
+        /* DIZAJN KARIET */
         .card {
-            background: white; padding: 15px; border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            background: white; padding: 20px; border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
-        h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        h2 { margin: 0 0 15px 0; font-size: 1.1rem; color: #1a1a1a; border-bottom: 2px solid #007bff; padding-bottom: 8px; display: inline-block; }
+        h3 { margin: 10px 0 5px 0; font-size: 0.95rem; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* TLAČIDLÁ */
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 10px;
+            cursor: pointer; font-size: 16px; font-weight: bold; color: white;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            margin-bottom: 8px; transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+
+        .btn-qr { background: linear-gradient(135deg, #007bff, #0056b3); }
+        .btn-ocr { background: linear-gradient(135deg, #6610f2, #4c0bce); }
+        .btn-load { background: #28a745; margin-top: 5px; }
+        .btn-print { background: #343a40; font-size: 18px; padding: 16px; margin-top: 20px; }
 
         /* VSTUPY */
+        .input-group { display: flex; gap: 5px; }
         .usb-input {
-            width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ccc; border-radius: 8px;
-            text-align: center; background: #f9f9f9; box-sizing: border-box;
+            flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px;
+            background: #fdfdfd;
+        }
+        .usb-input:focus { border-color: #007bff; outline: none; }
+
+        /* SKRYTÉ INPUTY PRE SÚBORY (iOS fallback) */
+        input[type="file"] { display: none; }
+
+        /* STAVOVÉ OKNO */
+        #status-box {
+            margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 14px; text-align: center;
+            display: none; background: #e9ecef; color: #333;
         }
 
-        /* KAMERA A FOTENIE */
-        #qr-reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; }
-        
-        .btn {
-            width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px;
-            cursor: pointer; color: white; font-weight: bold; margin-top: 8px; display: flex; justify-content: center; align-items: center; gap: 8px;
-        }
-        .btn-cam { background: #007bff; }
-        .btn-file { background: #6610f2; } /* Fialová pre fotenie */
-        .btn-stop { background: #dc3545; display: none; }
-        .btn-print { background: #28a745; font-size: 18px; margin-top: 20px; }
-
-        /* SKRYTÝ INPUT PRE FOTKU */
-        #qr-input-file { display: none; }
-
-        /* FORMULÁR */
-        .grid-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        /* FORMULÁR ÚDAJOV */
+        .grid-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
         .full { grid-column: span 2; }
-        .grid-form input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; width: 100%; box-sizing: border-box; font-size: 14px; }
+        .grid-form input { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; box-sizing: border-box; }
 
-        /* CHYBY */
-        #error-msg { color: #dc3545; background: #ffe6e6; padding: 10px; border-radius: 5px; font-size: 13px; display: none; margin-top: 5px; }
-
-        /* TLAČ */
+        /* TLAČOVÝ HÁROK (A4) */
         @media print {
             @page { size: A4; margin: 0; }
-            body { background: white; }
+            body { background: white; margin: 0; }
             #main-container { display: none; }
             .page-container { display: block !important; margin: 0 !important; box-shadow: none !important; }
         }
 
         .page-container {
             width: 210mm; height: 297mm; background: white;
-            padding: 10mm; box-sizing: border-box; display: block; overflow: hidden; margin-bottom: 50px;
+            padding: 10mm; box-sizing: border-box; display: block;
+            box-shadow: 0 0 20px rgba(0,0,0,0.15); margin-bottom: 50px;
         }
         .label-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(13, 1fr); width: 100%; height: 100%; }
-        .label { box-sizing: border-box; padding: 2px 4px; font-size: 9pt; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+        .label { padding: 2px 4px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; font-family: Arial, sans-serif; font-size: 9pt; }
+        
         .row-surname { font-weight: 900; text-transform: uppercase; font-size: 11pt; white-space: nowrap; overflow: hidden; }
         .row-name-kvl { display: flex; justify-content: space-between; }
         .row-rc { font-family: 'Courier New', monospace; letter-spacing: -0.5px; font-weight: bold; }
@@ -77,27 +88,27 @@
 <div id="main-container">
     
     <div class="card">
-        <h2>1. Načítanie kódu</h2>
-        
-        <label style="font-size:14px; font-weight:bold;">A) Windows (USB Skener):</label>
-        <input type="text" id="usbInput" class="usb-input" placeholder="Klikni a pípni..." autocomplete="off">
-        
-        <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+        <h2>1. Načítať údaje</h2>
+        <div id="status-box"></div>
 
-        <label style="font-size:14px; font-weight:bold;">B) Mobil (Kamera / Fotka):</label>
-        <div id="error-msg"></div>
-        
-        <button id="btn-start" class="btn btn-cam" onclick="startCamera()">📷 Spustiť živú kameru</button>
-        <button id="btn-stop" class="btn btn-stop" onclick="stopCamera()">❌ Zavrieť kameru</button>
-        
-        <label for="qr-input-file" class="btn btn-file">📁 Odfotiť QR kód (Istota)</label>
-        <input type="file" id="qr-input-file" accept="image/*" capture="environment">
+        <h3>A) QR Kód (Rýchle)</h3>
+        <label for="file-qr" class="btn btn-qr">📷 Skenovať / Odfotiť QR kód</label>
+        <input type="file" id="file-qr" accept="image/*" capture="environment">
 
-        <div id="qr-reader"></div>
+        <h3>B) Text z fotky (Pomalšie)</h3>
+        <label for="file-ocr" class="btn btn-ocr">📄 Odfotiť doklad (Prečítať text)</label>
+        <input type="file" id="file-ocr" accept="image/*" capture="environment">
+
+        <h3>C) Windows USB / Ručne</h3>
+        <div class="input-group">
+            <input type="text" id="usbInput" class="usb-input" placeholder="Klikni a pípni alebo vlož text..." autocomplete="off">
+            <button class="btn btn-load" onclick="processManualInput()" style="width: auto; margin: 0;">Načítať</button>
+        </div>
+        <p style="font-size:12px; color:#666; margin-top:5px;">Formát QR: Priezvisko|Meno|RC|Poisťovňa|Diagnóza</p>
     </div>
 
     <div class="card">
-        <h2>2. Údaje na štítok</h2>
+        <h2>2. Kontrola údajov</h2>
         <div class="grid-form">
             <input type="text" id="dataSurname" placeholder="PRIEZVISKO" class="full">
             <input type="text" id="dataName" placeholder="Meno" class="full">
@@ -105,14 +116,15 @@
             <input type="text" id="dataPoi" placeholder="Poisťovňa">
             <input type="text" id="dataDiag" placeholder="Diagnóza">
         </div>
-        <div style="margin-top:10px; display:flex; gap:10px; align-items:center; justify-content:center;">
-            <label>Odsun: <input type="number" id="offsetInput" value="0" style="width:40px"></label>
-            <label>Počet: <input type="number" id="countInput" value="10" style="width:40px"></label>
-            <button onclick="updatePreview()" style="padding:8px;">🔄 OK</button>
+
+        <div style="margin-top:15px; display:flex; gap:10px; justify-content:center; align-items:center;">
+            <label>Odsun: <input type="number" id="offsetInput" value="0" style="width:50px; padding:8px; border-radius:6px; border:1px solid #ccc;"></label>
+            <label>Počet: <input type="number" id="countInput" value="10" style="width:50px; padding:8px; border-radius:6px; border:1px solid #ccc;"></label>
+            <button onclick="updatePreview()" style="padding:8px 15px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">🔄 Prekresliť</button>
         </div>
     </div>
 
-    <button onclick="window.print()" class="btn btn-print">🖨️ Tlačiť</button>
+    <button onclick="window.print()" class="btn btn-print">🖨️ Tlačiť hárok</button>
 </div>
 
 <div class="page-container">
@@ -120,82 +132,112 @@
 </div>
 
 <script>
-    // --- LOGIKA ---
-    function processCode(text) {
-        if (!text) return;
-        text = text.trim();
-        const parts = text.split('|');
-        if (parts.length >= 5) {
-            document.getElementById('dataSurname').value = parts[0];
-            document.getElementById('dataName').value = parts[1];
-            document.getElementById('dataRC').value = parts[2];
-            document.getElementById('dataPoi').value = parts[3];
-            document.getElementById('dataDiag').value = parts[4];
-            
-            updatePreview();
-            alert("✅ Načítané: " + parts[0]);
-            return true;
-        } else {
-            alert("⚠️ Chybný formát QR kódu!");
-            return false;
-        }
+    // --- POMOCNÉ FUNKCIE ---
+    const statusBox = document.getElementById('status-box');
+
+    function showStatus(msg, type = 'info') {
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = msg;
+        statusBox.style.backgroundColor = type === 'error' ? '#f8d7da' : (type === 'success' ? '#d4edda' : '#e2e3e5');
+        statusBox.style.color = type === 'error' ? '#721c24' : (type === 'success' ? '#155724' : '#383d41');
     }
 
-    // --- 1. USB SKENER ---
-    const usbInput = document.getElementById('usbInput');
-    usbInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            if (processCode(this.value)) this.value = "";
-        }
-    });
-
-    // --- 2. FOTENIE SÚBORU (iPhone FIX) ---
-    const fileInput = document.getElementById('qr-input-file');
-    const html5QrCode = new Html5Qrcode("qr-reader");
-
-    fileInput.addEventListener('change', e => {
-        if (e.target.files.length == 0) return;
-        const imageFile = e.target.files[0];
+    // --- 1. SPRACOVANIE QR KÓDU (Formát s rúrou |) ---
+    document.getElementById('file-qr').addEventListener('change', e => {
+        if (e.target.files.length === 0) return;
+        showStatus("⏳ Skenujem QR kód...", 'info');
         
-        // Skenovanie zo súboru/fotky
-        html5QrCode.scanFile(imageFile, true)
+        const html5QrCode = new Html5Qrcode("status-box"); // Dummy element
+        html5QrCode.scanFile(e.target.files[0], true)
         .then(decodedText => {
-            processCode(decodedText);
+            if (decodedText.includes('|')) {
+                const parts = decodedText.split('|');
+                fillForm(parts[0], parts[1], parts[2], parts[3], parts[4]);
+                showStatus("✅ QR kód úspešne načítaný!", 'success');
+            } else {
+                showStatus("⚠️ QR kód nemá správny formát (chýba znak |)", 'error');
+            }
         })
         .catch(err => {
-            alert("❌ QR kód sa nenašiel na fotke. Skúste odfotiť bližšie a ostrejšie.");
+            showStatus("❌ QR kód sa nenašiel. Skúste ostrejšiu fotku.", 'error');
         });
     });
 
-    // --- 3. ŽIVÁ KAMERA ---
-    function startCamera() {
-        document.getElementById('error-msg').style.display = 'none';
-        document.getElementById('btn-start').style.display = "none";
-        document.getElementById('btn-stop').style.display = "flex";
+    // --- 2. SPRACOVANIE OCR (Text z dokladu) ---
+    document.getElementById('file-ocr').addEventListener('change', async (e) => {
+        if (e.target.files.length === 0) return;
+        showStatus("⏳ Čítam text z fotky... (Môže to trvať 5-10 sekúnd)", 'info');
+
+        try {
+            const { data: { text } } = await Tesseract.recognize(
+                e.target.files[0],
+                'slk', // Slovenčina
+            );
+            console.log("OCR Text:", text);
+            parseOCRText(text);
+            showStatus("✅ Text prečítaný. Skontrolujte údaje.", 'success');
+        } catch (error) {
+            console.error(error);
+            showStatus("❌ Chyba pri čítaní textu.", 'error');
+        }
+    });
+
+    function parseOCRText(text) {
+        // Vyčistenie textu
+        text = text.replace(/\n/g, " ").replace(/\s+/g, " ");
+
+        // Hľadanie údajov cez REGEX
+        const rcMatch = text.match(/RC[:\.\s]*(\d{6}\/?\d{3,4})|(\d{6}\/\d{3,4})/i);
+        const poiMatch = text.match(/Poi[:\.\s]*(\d{4})|(\d{4})/i) || text.match(/\b(25\d{2}|24\d{2}|27\d{2})\b/);
+        const diagMatch = text.match(/\b([A-Z]\d{2,3}(\.\d)?)\b/);
         
-        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, 
-            (decodedText) => {
-                processCode(decodedText);
-                stopCamera();
-            },
-            (errorMessage) => { /* ignorujeme chyby pri hľadaní */ }
-        ).catch(err => {
-            document.getElementById('error-msg').innerText = "Chyba kamery: " + err;
-            document.getElementById('error-msg').style.display = 'block';
-            stopCamera();
-        });
+        // Pokus o priezvisko (veľké písmená)
+        const words = text.split(" ");
+        let surname = "";
+        for (let w of words) {
+            if (w.length > 3 && w === w.toUpperCase() && !w.match(/\d/) && w !== "RC:" && w !== "POI:") {
+                surname = w; break;
+            }
+        }
+
+        let rc = rcMatch ? (rcMatch[1] || rcMatch[2]).replace(/\s/g, "") : "";
+        let poi = poiMatch ? (poiMatch[1] || poiMatch[0]) : "";
+        let diag = diagMatch ? diagMatch[0] : "";
+
+        fillForm(surname, "", rc, poi, diag);
     }
 
-    function stopCamera() {
-        html5QrCode.stop().then(() => {
-            document.getElementById('qr-reader').innerHTML = "";
-        }).catch(err => {}).finally(() => {
-            document.getElementById('btn-start').style.display = "flex";
-            document.getElementById('btn-stop').style.display = "none";
-        });
+    // --- 3. MANUÁLNE SPRACOVANIE / USB ---
+    function processManualInput() {
+        const text = document.getElementById('usbInput').value;
+        if (!text) return;
+
+        if (text.includes('|')) {
+            // Je to formát QR kódu
+            const parts = text.split('|');
+            fillForm(parts[0], parts[1], parts[2], parts[3], parts[4]);
+            document.getElementById('usbInput').value = ""; // Vyčistiť
+            showStatus("✅ Údaje načítané manuálne.", 'success');
+        } else {
+            showStatus("⚠️ Text neobsahuje oddeľovač |. Zadajte formát: Priezvisko|Meno...", 'error');
+        }
+    }
+    
+    // Enter v inpute spustí načítanie
+    document.getElementById('usbInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') processManualInput();
+    });
+
+    // --- SPOLOČNÉ FUNKCIE ---
+    function fillForm(surname, name, rc, poi, diag) {
+        if(surname) document.getElementById('dataSurname').value = surname;
+        if(name) document.getElementById('dataName').value = name;
+        if(rc) document.getElementById('dataRC').value = rc;
+        if(poi) document.getElementById('dataPoi').value = poi;
+        if(diag) document.getElementById('dataDiag').value = diag;
+        updatePreview();
     }
 
-    // --- PREKRESLENIE ---
     function updatePreview() {
         const grid = document.getElementById('gridContainer');
         grid.innerHTML = ''; 
