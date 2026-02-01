@@ -3,64 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tlač štítkov: QR + OCR + USB</title>
+    <title>Tlač štítkov: Verná kópia</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        /* ZÁKLADNÉ NASTAVENIA UI (Netýka sa tlače) */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #eef2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        #main-container { width: 100%; max-width: 700px; margin: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #333; border-bottom: 2px solid #0056b3; display: inline-block; }
         
-        #main-container {
-            width: 100%; max-width: 700px; margin: 15px;
-            display: flex; flex-direction: column; gap: 15px;
-        }
-
-        /* DIZAJN KARIET */
-        .card {
-            background: white; padding: 20px; border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-
-        h2 { margin: 0 0 15px 0; font-size: 1.1rem; color: #1a1a1a; border-bottom: 2px solid #007bff; padding-bottom: 8px; display: inline-block; }
-        h3 { margin: 10px 0 5px 0; font-size: 0.95rem; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* TLAČIDLÁ */
-        .btn {
-            width: 100%; padding: 14px; border: none; border-radius: 10px;
-            cursor: pointer; font-size: 16px; font-weight: bold; color: white;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            margin-bottom: 8px; transition: transform 0.1s;
-        }
-        .btn:active { transform: scale(0.98); }
-
-        .btn-qr { background: linear-gradient(135deg, #007bff, #0056b3); }
-        .btn-ocr { background: linear-gradient(135deg, #6610f2, #4c0bce); }
-        .btn-load { background: #28a745; margin-top: 5px; }
-        .btn-print { background: #343a40; font-size: 18px; padding: 16px; margin-top: 20px; }
-
-        /* VSTUPY */
+        /* Tlačidlá */
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; margin-bottom: 8px; font-size: 14px; }
+        .btn-qr { background: #007bff; }
+        .btn-ocr { background: #6610f2; }
+        .btn-print { background: #28a745; font-size: 18px; padding: 15px; margin-top: 20px; }
         .input-group { display: flex; gap: 5px; }
-        .usb-input {
-            flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px;
-            background: #fdfdfd;
-        }
-        .usb-input:focus { border-color: #007bff; outline: none; }
-
-        /* SKRYTÉ INPUTY PRE SÚBORY (iOS fallback) */
+        .usb-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
         input[type="file"] { display: none; }
-
-        /* STAVOVÉ OKNO */
-        #status-box {
-            margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 14px; text-align: center;
-            display: none; background: #e9ecef; color: #333;
-        }
-
-        /* FORMULÁR ÚDAJOV */
-        .grid-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
+        #status-box { padding: 10px; border-radius: 6px; text-align: center; display: none; margin-bottom: 10px; font-size: 13px; }
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .full { grid-column: span 2; }
-        .grid-form input { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        .grid-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
 
-        /* TLAČOVÝ HÁROK (A4) */
+        /* --- TLAČOVÝ ŠTÝL (A4) --- */
         @media print {
             @page { size: A4; margin: 0; }
             body { background: white; margin: 0; }
@@ -71,44 +38,95 @@
         .page-container {
             width: 210mm; height: 297mm; background: white;
             padding: 10mm; box-sizing: border-box; display: block;
-            box-shadow: 0 0 20px rgba(0,0,0,0.15); margin-bottom: 50px;
+            margin-bottom: 50px; overflow: hidden;
+            /* box-shadow: 0 0 10px rgba(0,0,0,0.2); pre náhľad na PC */
         }
-        .label-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(13, 1fr); width: 100%; height: 100%; }
-        .label { padding: 2px 4px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; font-family: Arial, sans-serif; font-size: 9pt; }
-        
-        .row-surname { font-weight: 900; text-transform: uppercase; font-size: 11pt; white-space: nowrap; overflow: hidden; }
-        .row-name-kvl { display: flex; justify-content: space-between; }
-        .row-rc { font-family: 'Courier New', monospace; letter-spacing: -0.5px; font-weight: bold; }
-        .row-poi-diag { display: flex; justify-content: space-between; align-items: flex-end; font-weight: bold; }
-        .diag-code { background: black; color: white; padding: 1px 4px; font-size: 9pt; }
+
+        .label-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(13, 1fr);
+            width: 100%; height: 100%;
+        }
+
+        /* --- DIZAJN ŠTÍTKU PODĽA FOTKY --- */
+        .label {
+            box-sizing: border-box;
+            padding: 1mm 2mm; /* Minimálne okraje vnútri štítku */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly; /* Rozložiť riadky rovnomerne */
+            overflow: hidden;
+            border: 1px solid white; /* Skrytý rámček */
+        }
+
+        /* 1. Riadok: PRIEZVISKO (Hrubé, Sans-Serif) */
+        .row-surname {
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-weight: 900;
+            font-size: 12pt;
+            text-transform: uppercase;
+            line-height: 1;
+            color: #000;
+        }
+
+        /* 2. Riadok: Meno a Kód (Sans-Serif) */
+        .row-name-kvl {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-family: 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1;
+        }
+
+        /* 3. a 4. Riadok: Technické údaje (Písací stroj / Courier) */
+        .row-tech {
+            font-family: 'Courier New', Courier, monospace; /* Toto robí ten "lekársky" vzhľad */
+            font-size: 10.5pt; 
+            font-weight: 600; /* Polotučné pre čitateľnosť */
+            white-space: nowrap;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            line-height: 1;
+            margin-top: 1px;
+        }
+
+        .diag-box {
+            font-weight: bold;
+        }
+
+        /* Jemné doladenie pre RC */
+        .rc-label { font-size: 9pt; margin-right: 5px; }
+        .rc-num { font-size: 11pt; letter-spacing: 0.5px; }
+
     </style>
 </head>
 <body>
 
 <div id="main-container">
-    
     <div class="card">
         <h2>1. Načítať údaje</h2>
         <div id="status-box"></div>
 
-        <h3>A) QR Kód (Rýchle)</h3>
-        <label for="file-qr" class="btn btn-qr">📷 Skenovať / Odfotiť QR kód</label>
+        <label for="file-qr" class="btn btn-qr">📷 Skenovať QR kód (Odfotiť)</label>
         <input type="file" id="file-qr" accept="image/*" capture="environment">
 
-        <h3>B) Text z fotky (Pomalšie)</h3>
         <label for="file-ocr" class="btn btn-ocr">📄 Odfotiť doklad (Prečítať text)</label>
         <input type="file" id="file-ocr" accept="image/*" capture="environment">
 
-        <h3>C) Windows USB / Ručne</h3>
-        <div class="input-group">
-            <input type="text" id="usbInput" class="usb-input" placeholder="Klikni a pípni alebo vlož text..." autocomplete="off">
-            <button class="btn btn-load" onclick="processManualInput()" style="width: auto; margin: 0;">Načítať</button>
+        <div class="input-group" style="margin-top:10px;">
+            <input type="text" id="usbInput" class="usb-input" placeholder="Klikni sem pre USB skener..." autocomplete="off">
+            <button class="btn btn-qr" onclick="processManualInput()" style="width: auto; margin:0; background:#28a745;">OK</button>
         </div>
-        <p style="font-size:12px; color:#666; margin-top:5px;">Formát QR: Priezvisko|Meno|RC|Poisťovňa|Diagnóza</p>
+        <div style="font-size:11px; color:#666; margin-top:5px;">
+            Podporovaný QR formát: PRIEZVISKO|Meno|RC|Poisťovňa|Diagnóza
+        </div>
     </div>
 
     <div class="card">
-        <h2>2. Kontrola údajov</h2>
+        <h2>2. Kontrola a Tlač</h2>
         <div class="grid-form">
             <input type="text" id="dataSurname" placeholder="PRIEZVISKO" class="full">
             <input type="text" id="dataName" placeholder="Meno" class="full">
@@ -116,15 +134,14 @@
             <input type="text" id="dataPoi" placeholder="Poisťovňa">
             <input type="text" id="dataDiag" placeholder="Diagnóza">
         </div>
-
-        <div style="margin-top:15px; display:flex; gap:10px; justify-content:center; align-items:center;">
-            <label>Odsun: <input type="number" id="offsetInput" value="0" style="width:50px; padding:8px; border-radius:6px; border:1px solid #ccc;"></label>
-            <label>Počet: <input type="number" id="countInput" value="10" style="width:50px; padding:8px; border-radius:6px; border:1px solid #ccc;"></label>
-            <button onclick="updatePreview()" style="padding:8px 15px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer;">🔄 Prekresliť</button>
+        <div style="margin-top:10px; display:flex; gap:10px; justify-content: center; align-items: center;">
+            <label>Odsun: <input type="number" id="offsetInput" value="0" style="width:40px"></label>
+            <label>Počet: <input type="number" id="countInput" value="10" style="width:40px"></label>
+            <button onclick="updatePreview()" style="padding:5px 10px;">🔄</button>
         </div>
     </div>
 
-    <button onclick="window.print()" class="btn btn-print">🖨️ Tlačiť hárok</button>
+    <button onclick="window.print()" class="btn btn-print">🖨️ Tlačiť štítky</button>
 </div>
 
 <div class="page-container">
@@ -132,137 +149,121 @@
 </div>
 
 <script>
-    // --- POMOCNÉ FUNKCIE ---
+    // --- SKRIPT ---
     const statusBox = document.getElementById('status-box');
 
-    function showStatus(msg, type = 'info') {
+    function showStatus(msg, color) {
         statusBox.style.display = 'block';
-        statusBox.innerHTML = msg;
-        statusBox.style.backgroundColor = type === 'error' ? '#f8d7da' : (type === 'success' ? '#d4edda' : '#e2e3e5');
-        statusBox.style.color = type === 'error' ? '#721c24' : (type === 'success' ? '#155724' : '#383d41');
+        statusBox.innerText = msg;
+        statusBox.style.backgroundColor = color === 'success' ? '#d4edda' : '#f8d7da';
+        statusBox.style.color = color === 'success' ? '#155724' : '#721c24';
     }
 
-    // --- 1. SPRACOVANIE QR KÓDU (Formát s rúrou |) ---
+    // 1. QR SKENER (Zo súboru/fotky)
     document.getElementById('file-qr').addEventListener('change', e => {
-        if (e.target.files.length === 0) return;
-        showStatus("⏳ Skenujem QR kód...", 'info');
-        
-        const html5QrCode = new Html5Qrcode("status-box"); // Dummy element
+        if (!e.target.files.length) return;
+        const html5QrCode = new Html5Qrcode("status-box");
         html5QrCode.scanFile(e.target.files[0], true)
         .then(decodedText => {
             if (decodedText.includes('|')) {
-                const parts = decodedText.split('|');
-                fillForm(parts[0], parts[1], parts[2], parts[3], parts[4]);
-                showStatus("✅ QR kód úspešne načítaný!", 'success');
+                const p = decodedText.split('|');
+                fill(p[0], p[1], p[2], p[3], p[4]);
+                showStatus("✅ QR načítaný: " + p[0], 'success');
             } else {
-                showStatus("⚠️ QR kód nemá správny formát (chýba znak |)", 'error');
+                showStatus("⚠️ Zlý formát QR kódu", 'error');
             }
-        })
-        .catch(err => {
-            showStatus("❌ QR kód sa nenašiel. Skúste ostrejšiu fotku.", 'error');
-        });
+        }).catch(err => showStatus("❌ QR sa nenašiel, skúste lepšiu fotku.", 'error'));
     });
 
-    // --- 2. SPRACOVANIE OCR (Text z dokladu) ---
+    // 2. OCR (Text z fotky)
     document.getElementById('file-ocr').addEventListener('change', async (e) => {
-        if (e.target.files.length === 0) return;
-        showStatus("⏳ Čítam text z fotky... (Môže to trvať 5-10 sekúnd)", 'info');
-
+        if (!e.target.files.length) return;
+        showStatus("⏳ Čítam text... čakajte.", 'success');
         try {
-            const { data: { text } } = await Tesseract.recognize(
-                e.target.files[0],
-                'slk', // Slovenčina
-            );
-            console.log("OCR Text:", text);
-            parseOCRText(text);
-            showStatus("✅ Text prečítaný. Skontrolujte údaje.", 'success');
-        } catch (error) {
-            console.error(error);
-            showStatus("❌ Chyba pri čítaní textu.", 'error');
-        }
+            const { data: { text } } = await Tesseract.recognize(e.target.files[0], 'slk');
+            parseOCR(text);
+            showStatus("✅ Text načítaný.", 'success');
+        } catch (err) { showStatus("❌ Chyba čítania.", 'error'); }
     });
 
-    function parseOCRText(text) {
-        // Vyčistenie textu
+    function parseOCR(text) {
         text = text.replace(/\n/g, " ").replace(/\s+/g, " ");
-
-        // Hľadanie údajov cez REGEX
-        const rcMatch = text.match(/RC[:\.\s]*(\d{6}\/?\d{3,4})|(\d{6}\/\d{3,4})/i);
-        const poiMatch = text.match(/Poi[:\.\s]*(\d{4})|(\d{4})/i) || text.match(/\b(25\d{2}|24\d{2}|27\d{2})\b/);
-        const diagMatch = text.match(/\b([A-Z]\d{2,3}(\.\d)?)\b/);
+        // Regexy pre údaje
+        const rc = text.match(/RC[:\.\s]*(\d{6}\/?\d{3,4})|(\d{6}\/\d{3,4})/i);
+        const poi = text.match(/Poi[:\.\s]*(\d{4})|(\d{4})/i) || text.match(/\b(25\d{2}|24\d{2})\b/);
+        const diag = text.match(/\b([A-Z]\d{2,3}(\.\d)?)\b/);
         
-        // Pokus o priezvisko (veľké písmená)
-        const words = text.split(" ");
+        // Priezvisko (veľké písmená > 3 znaky)
         let surname = "";
-        for (let w of words) {
-            if (w.length > 3 && w === w.toUpperCase() && !w.match(/\d/) && w !== "RC:" && w !== "POI:") {
-                surname = w; break;
-            }
-        }
+        text.split(" ").forEach(w => {
+            if (w.length > 3 && w === w.toUpperCase() && !w.match(/\d/) && !w.includes("RC") && !w.includes("POI")) surname = w;
+        });
 
-        let rc = rcMatch ? (rcMatch[1] || rcMatch[2]).replace(/\s/g, "") : "";
-        let poi = poiMatch ? (poiMatch[1] || poiMatch[0]) : "";
-        let diag = diagMatch ? diagMatch[0] : "";
-
-        fillForm(surname, "", rc, poi, diag);
+        fill(surname, "", 
+             rc ? (rc[1]||rc[2]).replace(/\s/g,"") : "", 
+             poi ? (poi[1]||poi[0]) : "", 
+             diag ? diag[0] : "");
     }
 
-    // --- 3. MANUÁLNE SPRACOVANIE / USB ---
+    // 3. USB / Ručne
     function processManualInput() {
-        const text = document.getElementById('usbInput').value;
-        if (!text) return;
-
-        if (text.includes('|')) {
-            // Je to formát QR kódu
-            const parts = text.split('|');
-            fillForm(parts[0], parts[1], parts[2], parts[3], parts[4]);
-            document.getElementById('usbInput').value = ""; // Vyčistiť
-            showStatus("✅ Údaje načítané manuálne.", 'success');
-        } else {
-            showStatus("⚠️ Text neobsahuje oddeľovač |. Zadajte formát: Priezvisko|Meno...", 'error');
+        const val = document.getElementById('usbInput').value;
+        if (val.includes('|')) {
+            const p = val.split('|');
+            fill(p[0], p[1], p[2], p[3], p[4]);
+            document.getElementById('usbInput').value = "";
         }
     }
-    
-    // Enter v inpute spustí načítanie
-    document.getElementById('usbInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') processManualInput();
+    document.getElementById('usbInput').addEventListener('keydown', e => {
+        if(e.key === 'Enter') processManualInput();
     });
 
-    // --- SPOLOČNÉ FUNKCIE ---
-    function fillForm(surname, name, rc, poi, diag) {
-        if(surname) document.getElementById('dataSurname').value = surname;
-        if(name) document.getElementById('dataName').value = name;
-        if(rc) document.getElementById('dataRC').value = rc;
-        if(poi) document.getElementById('dataPoi').value = poi;
-        if(diag) document.getElementById('dataDiag').value = diag;
+    function fill(s, n, r, p, d) {
+        if(s) document.getElementById('dataSurname').value = s;
+        if(n) document.getElementById('dataName').value = n;
+        if(r) document.getElementById('dataRC').value = r;
+        if(p) document.getElementById('dataPoi').value = p;
+        if(d) document.getElementById('dataDiag').value = d;
         updatePreview();
     }
 
+    // PREKRESLENIE ŠTÍTKOV (Dizajn)
     function updatePreview() {
         const grid = document.getElementById('gridContainer');
-        grid.innerHTML = ''; 
+        grid.innerHTML = '';
         const offset = parseInt(document.getElementById('offsetInput').value) || 0;
         const count = parseInt(document.getElementById('countInput').value) || 1;
         
-        const data = {
-            surname: document.getElementById('dataSurname').value || "PRIEZVISKO",
-            name: document.getElementById('dataName').value || "Meno",
+        const d = {
+            sur: document.getElementById('dataSurname').value || "PRIEZVISKO",
+            nam: document.getElementById('dataName').value || "Meno",
             rc: document.getElementById('dataRC').value || "000000/0000",
             poi: document.getElementById('dataPoi').value || "0000",
-            diag: document.getElementById('dataDiag').value || "X00.0",
+            diag: document.getElementById('dataDiag').value || "Dg.X",
             kvl: "KVL1-KJ"
         };
 
-        for (let i = 0; i < offset; i++) grid.appendChild(document.createElement('div'));
-        for (let i = 0; i < count; i++) {
-            const label = document.createElement('div');
-            label.className = 'label';
-            label.innerHTML = `
-                <div class="row-surname">${data.surname}</div>
-                <div class="row-name-kvl"><span>${data.name}</span><span style="font-size:7pt;">${data.kvl}</span></div>
-                <div class="row-rc">RC: ${data.rc}</div>
-                <div class="row-poi-diag"><span>Poi: ${data.poi}</span><span class="diag-code">${data.diag}</span></div>`;
-            grid.appendChild(label);
+        for(let i=0; i<offset; i++) grid.appendChild(document.createElement('div'));
+        
+        for(let i=0; i<count; i++) {
+            const el = document.createElement('div');
+            el.className = 'label';
+            // HTML štruktúra presne podľa vizuálu
+            el.innerHTML = `
+                <div class="row-surname">${d.sur}</div>
+                <div class="row-name-kvl">
+                    <span>${d.nam}</span>
+                    <span style="font-size: 8pt;">${d.kvl}</span>
+                </div>
+                <div class="row-tech">
+                    <span><span class="rc-label">RC:</span><span class="rc-num">${d.rc}</span></span>
+                </div>
+                <div class="row-tech">
+                    <span>Poi: ${d.poi}</span>
+                    <span class="diag-box">${d.diag}</span>
+                </div>
+            `;
+            grid.appendChild(el);
         }
     }
     window.onload = updatePreview;
