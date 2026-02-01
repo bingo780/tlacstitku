@@ -3,67 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inteligentná Tlač Štítkov (OCR)</title>
-    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <title>Super Skener: Windows + Android + iOS</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f2f2f7; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* OVLÁDACÍ PANEL */
-        #controls {
-            background: white; padding: 20px; margin: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 12px;
-            width: 95%; max-width: 600px;
+        #main-container {
+            width: 100%; max-width: 900px; margin: 10px;
+            display: flex; flex-direction: column; gap: 15px;
         }
 
-        h2 { margin-top: 0; font-size: 1.1rem; text-align: center; color: #333; }
+        /* OVLÁDACIA ČASŤ */
+        .card {
+            background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
 
-        /* Tlačidlá a Inputs */
-        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        h2 { margin: 0 0 10px 0; font-size: 1.2rem; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px; display: inline-block; }
+
+        /* VSTUPY */
+        .usb-input {
+            width: 100%; padding: 15px; font-size: 18px; border: 3px solid #ccc; border-radius: 8px;
+            text-align: center; background: #f9f9f9; box-sizing: border-box;
+        }
+        .usb-input:focus { border-color: #28a745; background: #fff; outline: none; }
+
+        /* KAMERA */
+        #qr-reader { width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
         
-        /* Skrytý input pre súbor */
-        #cameraInput { display: none; }
+        .btn {
+            width: 100%; padding: 12px; font-size: 16px; border: none; border-radius: 6px;
+            cursor: pointer; color: white; font-weight: bold; margin-top: 10px;
+        }
+        .btn-cam { background: #007bff; }
+        .btn-stop { background: #dc3545; display: none; }
+        .btn-print { background: #28a745; font-size: 18px; padding: 15px; }
 
-        .btn-photo {
-            background-color: #007AFF; color: white;
-            padding: 15px; border-radius: 10px; border: none;
-            font-size: 18px; font-weight: bold; cursor: pointer;
-            text-align: center; display: block; width: 100%; box-sizing: border-box;
-        }
-        
-        .btn-print {
-            background-color: #34C759; color: white;
-            padding: 12px; border-radius: 8px; border: none;
-            font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;
-        }
+        /* FORMULÁR */
+        .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+        .grid-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
 
-        .inputs-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;
-        }
-        input {
-            padding: 10px; border: 1px solid #c7c7cc; border-radius: 8px;
-            font-size: 16px; width: 100%; box-sizing: border-box;
-        }
-        .full-width { grid-column: span 2; }
+        /* CHYBOVÉ HLÁŠKY */
+        #error-msg { color: red; font-weight: bold; font-size: 14px; margin-top: 5px; display: none; background: #ffe6e6; padding: 10px; border-radius: 5px; }
 
-        /* Loading stav */
-        #statusMessage {
-            text-align: center; color: #666; font-size: 0.9rem; margin: 10px 0; font-style: italic; min-height: 20px;
-        }
-
-        /* --- TLAČ (A4) --- */
+        /* --- TLAČ (A4 5x13) --- */
         @media print {
             @page { size: A4; margin: 0; }
-            body { background: white; }
-            #controls { display: none; }
-            .page-container { box-shadow: none !important; margin: 0 !important; }
+            body { background: white; margin: 0; }
+            #main-container { display: none; }
+            .page-container { display: block !important; margin: 0 !important; box-shadow: none !important; }
         }
 
+        /* NÁHĽAD STRANY */
         .page-container {
             width: 210mm; height: 297mm; background: white;
             padding: 10mm; box-sizing: border-box;
-            /* box-shadow: 0 0 10px rgba(0,0,0,0.2); */
-            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            overflow: hidden; margin-bottom: 50px;
+            /* Pri mobile skryjeme náhľad pod seba, pri tlači sa ukáže */
+            display: block; 
         }
 
         .label-grid {
@@ -74,7 +73,7 @@
         }
 
         .label {
-            padding: 2px 4px; box-sizing: border-box;
+            box-sizing: border-box; padding: 2px 4px;
             font-size: 9pt; display: flex; flex-direction: column;
             justify-content: space-between; overflow: hidden;
         }
@@ -84,167 +83,189 @@
         .row-rc { font-family: 'Courier New', monospace; letter-spacing: -0.5px; font-weight: bold; }
         .row-poi-diag { display: flex; justify-content: space-between; align-items: flex-end; font-weight: bold; }
         .diag-code { background: black; color: white; padding: 1px 4px; font-size: 9pt; }
+
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <h2>Generátor štítkov (iOS OCR)</h2>
+<div id="main-container">
+    
+    <div class="card">
+        <h2>1. Načítanie (Windows / Android / iOS)</h2>
+        
+        <label style="font-weight:bold; display:block; margin-bottom:5px;">A) Windows USB Skener:</label>
+        <input type="text" id="usbInput" class="usb-input" placeholder="Klikni sem a pípni kód..." autocomplete="off">
+        
+        <label style="font-weight:bold; display:block; margin-top:15px; margin-bottom:5px;">B) Kamera (Mobil/Tablet):</label>
+        <div id="error-msg"></div>
+        <div id="qr-reader"></div>
+        <button id="btn-start" class="btn btn-cam" onclick="startCamera()">📷 Spustiť kameru</button>
+        <button id="btn-stop" class="btn btn-stop" onclick="stopCamera()">❌ Zavrieť kameru</button>
+    </div>
 
-        <label for="cameraInput" class="btn-photo">
-            📷 Odfotiť doklad a načítať
-        </label>
-        <input type="file" id="cameraInput" accept="image/*" capture="environment">
-
-        <div id="statusMessage">Pripravené na fotenie...</div>
-
-        <div class="inputs-grid">
-            <input type="text" id="dataSurname" placeholder="PRIEZVISKO" class="full-width">
-            <input type="text" id="dataName" placeholder="Meno" class="full-width">
+    <div class="card">
+        <h2>2. Údaje na štítok</h2>
+        <div class="grid-form">
+            <input type="text" id="dataSurname" placeholder="Priezvisko">
+            <input type="text" id="dataName" placeholder="Meno">
             <input type="text" id="dataRC" placeholder="Rodné číslo">
             <input type="text" id="dataPoi" placeholder="Poisťovňa">
             <input type="text" id="dataDiag" placeholder="Diagnóza">
         </div>
-
-        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; justify-content: center;">
-            <label>Vynechať: <input type="number" id="offsetInput" value="0" style="width: 50px; padding: 5px;"></label>
-            <label>Počet: <input type="number" id="countInput" value="10" style="width: 50px; padding: 5px;"></label>
+        <div style="margin-top:10px; display:flex; gap:10px; justify-content:center; align-items:center;">
+            <label>Vynechať: <input type="number" id="offsetInput" value="0" style="width:50px"></label>
+            <label>Počet: <input type="number" id="countInput" value="10" style="width:50px"></label>
+            <button onclick="updatePreview()" style="padding:5px 15px; cursor:pointer;">🔄 Prekresliť</button>
         </div>
-
-        <button onclick="updatePreview()" style="background:#007AFF; color:white; border:none; padding:10px; width:100%; margin-top:10px; border-radius:8px;">🔄 Aktualizovať náhľad</button>
-        <button onclick="window.print()" class="btn-print">🖨️ Tlačiť</button>
     </div>
 
-    <div class="page-container">
-        <div class="label-grid" id="gridContainer"></div>
-    </div>
+    <button onclick="window.print()" class="btn btn-print">🖨️ Tlačiť (A4)</button>
+</div>
 
-    <script>
-        // --- 1. LOGIKA OCR (Rozpoznávanie textu) ---
-        const cameraInput = document.getElementById('cameraInput');
-        const statusMsg = document.getElementById('statusMessage');
+<div class="page-container">
+    <div class="label-grid" id="gridContainer"></div>
+</div>
 
-        cameraInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+<script>
+    // --- KONFIGURÁCIA ---
+    // Očakávaný formát QR: PRIEZVISKO|MENO|RC|POI|DIAGNOZA
+    
+    function processCode(text) {
+        if (!text) return;
+        text = text.trim();
+        console.log("Spracovávam:", text);
 
-            statusMsg.innerHTML = "⏳ Spracovávam fotku... (cca 5 sekúnd)";
-            statusMsg.style.color = "#007AFF";
-
-            try {
-                // Spustenie Tesseract OCR
-                const { data: { text } } = await Tesseract.recognize(
-                    file,
-                    'slk', // Slovenčina (alebo 'eng' ak slk blbne)
-                    { logger: m => console.log(m) }
-                );
-
-                console.log("Načítaný text:", text);
-                statusMsg.innerHTML = "✅ Údaje načítané!";
-                statusMsg.style.color = "green";
-
-                parseText(text);
-
-            } catch (error) {
-                console.error(error);
-                statusMsg.innerHTML = "❌ Chyba pri čítaní. Skúste znova.";
-                statusMsg.style.color = "red";
-            }
-        });
-
-        // --- 2. INTELIGENTNÉ HĽADANIE ÚDAJOV (Regex) ---
-        function parseText(rawText) {
-            // Vyčistenie textu
-            const text = rawText.replace(/\n/g, " ").replace(/\s+/g, " ");
-
-            // A. Hľadanie RODNÉHO ČÍSLA (formát 6 číslic / 3-4 číslice, alebo bez lomky)
-            // Hľadáme vzor: RC: cislo alebo len dlhé číslo
-            const rcMatch = text.match(/RC[:\.\s]*(\d{6}\/?\d{3,4})|(\d{6}\/\d{3,4})/i);
-            if (rcMatch) {
-                let cleanRC = (rcMatch[1] || rcMatch[2]).replace(/\s/g, "");
-                document.getElementById('dataRC').value = cleanRC;
-            }
-
-            // B. Hľadanie POISŤOVNE (kód 25xx, 24xx, 27xx)
-            // Hľadáme za slovom Poi alebo ID poist
-            const poiMatch = text.match(/Poi[:\.\s]*(\d{4})|(\d{4})/i);
-            // Jednoduchá heuristika: Ak nájdeme 4-ciferné číslo začínajúce na 2
-            const simplePoi = text.match(/\b(25\d{2}|24\d{2}|27\d{2})\b/);
+        const parts = text.split('|');
+        if (parts.length >= 5) {
+            document.getElementById('dataSurname').value = parts[0];
+            document.getElementById('dataName').value = parts[1];
+            document.getElementById('dataRC').value = parts[2];
+            document.getElementById('dataPoi').value = parts[3];
+            document.getElementById('dataDiag').value = parts[4];
             
-            if (poiMatch && poiMatch[1]) document.getElementById('dataPoi').value = poiMatch[1];
-            else if (simplePoi) document.getElementById('dataPoi').value = simplePoi[0];
-
-            // C. Hľadanie DIAGNÓZY (Písmeno + čísla, napr. R06.0, I10)
-            const diagMatch = text.match(/\b([A-Z]\d{2,3}(\.\d)?)\b/);
-            if (diagMatch) {
-                document.getElementById('dataDiag').value = diagMatch[0];
-            }
-
-            // D. Hľadanie MENA a PRIEZVISKA (Najťažšie, skúsime odhadnúť)
-            // Priezvisko býva často veľkým písmom (ALL CAPS)
-            const words = rawText.split(/[\n\s]+/);
-            let surnameFound = "";
-            let nameFound = "";
-
-            // Hľadáme slovo, ktoré je celé VEĽKÝM a má aspoň 3 písmená (IMRIAN)
-            for (let w of words) {
-                if (w.length > 2 && w === w.toUpperCase() && !w.match(/\d/) && w !== "RC:" && w !== "POI:") {
-                    surnameFound = w;
-                    break;
-                }
-            }
-            if (surnameFound) document.getElementById('dataSurname').value = surnameFound;
-
-            // Meno býva zvyčajne vedľa priezviska alebo prvé slovo s veľkým písmenom
-            // Tu to necháme na užívateľa alebo skúsime prvé slovo s veľkým začiatočným
-            // Tento krok je v OCR často nepresný, preto je lepšie ak si meno skontroluje užívateľ.
+            // Pípnutie / vizuálna odozva
+            document.body.style.backgroundColor = "#d4edda";
+            setTimeout(() => { document.body.style.backgroundColor = "#eef2f5"; }, 300);
             
             updatePreview();
+            return true;
+        } else {
+            alert("⚠️ Chyba formátu!\nOčakáva sa: Priezvisko|Meno|RC|Poisťovňa|Diagnóza\nNačítané: " + text);
+            return false;
         }
+    }
 
-
-        // --- 3. GENERÁTOR ŠTÍTKOV (Rovnaký ako predtým) ---
-        function updatePreview() {
-            const grid = document.getElementById('gridContainer');
-            grid.innerHTML = ''; 
-
-            const offset = parseInt(document.getElementById('offsetInput').value) || 0;
-            const count = parseInt(document.getElementById('countInput').value) || 1;
-            
-            const data = {
-                surname: document.getElementById('dataSurname').value || "PRIEZVISKO",
-                name: document.getElementById('dataName').value || "Meno",
-                rc: document.getElementById('dataRC').value || "000000/0000",
-                poi: document.getElementById('dataPoi').value || "0000",
-                diag: document.getElementById('dataDiag').value || "",
-                kvl: "KVL1-KJ"
-            };
-
-            for (let i = 0; i < offset; i++) {
-                grid.appendChild(document.createElement('div'));
-            }
-
-            for (let i = 0; i < count; i++) {
-                const label = document.createElement('div');
-                label.className = 'label';
-                label.innerHTML = `
-                    <div class="row-surname">${data.surname}</div>
-                    <div class="row-name-kvl">
-                        <span>${data.name}</span>
-                        <span style="font-size: 7pt;">${data.kvl}</span>
-                    </div>
-                    <div class="row-rc">RC: ${data.rc}</div>
-                    <div class="row-poi-diag">
-                        <span>Poi: ${data.poi}</span>
-                        <span class="diag-code">${data.diag}</span>
-                    </div>
-                `;
-                grid.appendChild(label);
+    // --- A) USB SKENER (Windows) ---
+    const usbInput = document.getElementById('usbInput');
+    usbInput.focus(); // Hneď po načítaní aktívne
+    usbInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            if (processCode(this.value)) {
+                this.value = ""; // Vymazať po úspechu
             }
         }
+    });
+    // Vždy udržať kurzor v poli ak neklikneme inam (pre plynulé skenovanie rad za radom)
+    document.addEventListener('click', function(e) {
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") {
+            usbInput.focus();
+        }
+    });
+
+    // --- B) KAMERA (Mobil) ---
+    let html5QrCode;
+    
+    function startCamera() {
+        const errorEl = document.getElementById('error-msg');
+        errorEl.style.display = 'none';
+
+        // Kontrola bezpečnosti pre mobily
+        if (location.protocol === 'file:' && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+            errorEl.innerHTML = "⚠️ CHYBA: Na mobiloch kamera nefunguje, ak súbor otvárate priamo z pamäte (file://).<br>Musíte tento súbor nahrať na web (musí byť HTTPS).";
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        document.getElementById('qr-reader').style.display = "block";
+        document.getElementById('btn-start').style.display = "none";
+        document.getElementById('btn-stop').style.display = "inline-block";
+
+        html5QrCode = new Html5Qrcode("qr-reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
         
-        // Inicializácia
-        window.onload = updatePreview;
-    </script>
+        // Preferujeme zadnú kameru (environment)
+        html5QrCode.start({ facingMode: "environment" }, config, 
+            (decodedText) => {
+                // Úspešný sken
+                if(processCode(decodedText)) {
+                    stopCamera(); // Zavrieť kameru po úspechu
+                }
+            },
+            (errorMessage) => {
+                // Ignorujeme chyby pri hľadaní kódu
+            }
+        ).catch(err => {
+            errorEl.innerHTML = "❌ Nepodarilo sa spustiť kameru: " + err;
+            errorEl.style.display = 'block';
+            stopCamera();
+        });
+    }
+
+    function stopCamera() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                document.getElementById('qr-reader').style.display = "none";
+                document.getElementById('btn-start').style.display = "inline-block";
+                document.getElementById('btn-stop').style.display = "none";
+            }).catch(err => console.log(err));
+        }
+    }
+
+    // --- C) PREKRESLENIE ŠTÍTKOV ---
+    function updatePreview() {
+        const grid = document.getElementById('gridContainer');
+        grid.innerHTML = ''; 
+
+        const offset = parseInt(document.getElementById('offsetInput').value) || 0;
+        const count = parseInt(document.getElementById('countInput').value) || 1;
+        
+        const data = {
+            surname: document.getElementById('dataSurname').value || "PRIEZVISKO",
+            name: document.getElementById('dataName').value || "Meno",
+            rc: document.getElementById('dataRC').value || "000000/0000",
+            poi: document.getElementById('dataPoi').value || "0000",
+            diag: document.getElementById('dataDiag').value || "X00.0",
+            kvl: "KVL1-KJ"
+        };
+
+        // Prázdne bunky
+        for (let i = 0; i < offset; i++) {
+            grid.appendChild(document.createElement('div'));
+        }
+
+        // Dáta
+        for (let i = 0; i < count; i++) {
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.innerHTML = `
+                <div class="row-surname">${data.surname}</div>
+                <div class="row-name-kvl">
+                    <span>${data.name}</span>
+                    <span style="font-size: 7pt;">${data.kvl}</span>
+                </div>
+                <div class="row-rc">RC: ${data.rc}</div>
+                <div class="row-poi-diag">
+                    <span>Poi: ${data.poi}</span>
+                    <span class="diag-code">${data.diag}</span>
+                </div>
+            `;
+            grid.appendChild(label);
+        }
+    }
+
+    window.onload = updatePreview;
+</script>
+
 </body>
 </html>
